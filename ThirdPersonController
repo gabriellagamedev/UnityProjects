@@ -1,0 +1,222 @@
+using UnityEngine;
+
+[RequireComponent(typeof(CharacterController))]
+public class ThirdPersonController : MonoBehaviour
+{
+    public static ThirdPersonController Instance { get; private set; }
+
+    [Header("Movement")]
+    [SerializeField] private float rotationSpeed = 10f;
+
+    [Header("Gravity")]
+    [SerializeField] private float gravity = -20f;
+    [SerializeField] private float groundCheckDistance = 0.2f;
+    [SerializeField] private LayerMask groundLayer;
+
+    [Header("Camera")]
+    [SerializeField] private Transform cameraTarget;
+    [SerializeField] private float cameraSensitivity = 2f;
+    [SerializeField] private float cameraDistance = 5f;
+    [SerializeField] private float cameraMinVertical = -30f;
+    [SerializeField] private float cameraMaxVertical = 60f;
+    [SerializeField] private Vector3 cameraOffset = new Vector3(0f, 1.5f, 0f);
+
+    [Header("Animation")]
+    [SerializeField] private Animator animator;
+
+    // Animation parameter hashes
+    private static readonly int SpeedHash = Animator.StringToHash("Speed");
+    private static readonly int IsGroundedHash = Animator.StringToHash("IsGrounded");
+    private static readonly int IsRunningHash = Animator.StringToHash("IsRunning");
+
+    private CharacterController controller;
+    private Vector3 verticalVelocity;
+    private float cameraYaw;
+    private float cameraPitch;
+    private bool isActive;
+    private bool isGrounded;
+    private UnityEngine.Camera mainCamera;
+    private Transform originalCameraParent;
+    private Vector3 originalCameraLocalPos;
+    private Quaternion originalCameraLocalRot;
+
+    // Input values
+    private float inputX;
+    private float inputZ;
+    private bool isRunning;
+    private float currentSpeed;
+
+    public bool IsActive => isActive;
+
+    void Awake()
+    {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        Instance = this;
+
+        controller = GetComponent<CharacterController>();
+
+        if (animator == null)
+            animator = GetComponentInChildren<Animator>();
+
+        if (cameraTarget == null)
+        {
+            GameObject target = new GameObject("CameraTarget");
+            target.transform.SetParent(transform);
+            target.transform.localPosition = cameraOffset;
+            cameraTarget = target.transform;
+        }
+    }
+
+    void Start()
+    {
+        mainCamera = UnityEngine.Camera.main;
+        isActive = false;
+        enabled = false;
+
+        if (animator != null)
+            animator.applyRootMotion = true;
+    }
+
+    void Update()
+    {
+        if (!isActive) return;
+
+        HandleInput();
+        HandleCamera();
+        HandleRotation();
+        CheckGround();
+        ApplyGravity();
+        UpdateAnimator();
+    }
+
+    void OnAnimatorMove()
+    {
+        if (!isActive || animator == null) return;
+
+        Vector3 rootMotion = animator.deltaPosition;
+        rootMotion.y = 0f;
+
+        controller.Move(rootMotion + verticalVelocity * Time.deltaTime);
+    }
+
+    public void Activate()
+    {
+        if (mainCamera == null)
+            mainCamera = UnityEngine.Camera.main;
+
+        originalCameraParent = mainCamera.transform.parent;
+        originalCameraLocalPos = mainCamera.transform.localPosition;
+        originalCameraLocalRot = mainCamera.transform.localRotation;
+
+        cameraYaw = transform.eulerAngles.y;
+        cameraPitch = 20f;
+
+        if (animator != null)
+            animator.applyRootMotion = true;
+
+        isActive = true;
+        enabled = true;
+
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+    }
+
+    public void Deactivate()
+    {
+        isActive = false;
+        enabled = false;
+
+        if (mainCamera != null && originalCameraParent != null)
+        {
+            mainCamera.transform.SetParent(originalCameraParent);
+            mainCamera.transform.localPosition = originalCameraLocalPos;
+            mainCamera.transform.localRotation = originalCameraLocalRot;
+        }
+
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+
+        if (animator != null)
+        {
+            animator.SetFloat(SpeedHash, 0f);
+        }
+    }
+
+    private void HandleInput()
+    {
+        inputX = Input.GetAxis("Horizontal");
+        inputZ = Input.GetAxis("Vertical");
+        isRunning = Input.GetKey(KeyCode.LeftShift);
+    }
+
+    private void HandleCamera()
+    {
+        float mouseX = Input.GetAxis("Mouse X") * cameraSensitivity;
+        float mouseY = Input.GetAxis("Mouse Y") * cameraSensitivity;
+
+        cameraYaw += mouseX;
+        cameraPitch -= mouseY;
+        cameraPitch = Mathf.Clamp(cameraPitch, cameraMinVertical, cameraMaxVertical);
+
+        Quaternion rotation = Quaternion.Euler(cameraPitch, cameraYaw, 0f);
+        Vector3 targetPosition = cameraTarget.position - rotation * Vector3.forward * cameraDistance;
+
+        mainCamera.transform.position = targetPosition;
+        mainCamera.transform.LookAt(cameraTarget.position);
+    }
+
+    private void HandleRotation()
+    {
+        Vector3 inputDir = new Vector3(inputX, 0f, inputZ).normalized;
+
+        if (inputDir.magnitude >= 0.1f)
+        {
+            // Calculate target angle based on input + camera direction
+            float targetAngle = Mathf.Atan2(inputDir.x, inputDir.z) * Mathf.Rad2Deg + cameraYaw;
+
+            // Smoothly rotate character to face movement direction
+            float angle = Mathf.LerpAngle(transform.eulerAngles.y, targetAngle, rotationSpeed * Time.deltaTime);
+            transform.rotation = Quaternion.Euler(0f, angle, 0f);
+        }
+    }
+
+    private void CheckGround()
+    {
+        isGrounded = Physics.CheckSphere(transform.position, groundCheckDistance, groundLayer);
+
+        if (animator != null)
+            animator.SetBool(IsGroundedHash, isGrounded);
+    }
+
+    private void ApplyGravity()
+    {
+        if (isGrounded && verticalVelocity.y < 0f)
+        {
+            verticalVelocity.y = -2f;
+        }
+
+        verticalVelocity.y += gravity * Time.deltaTime;
+    }
+
+    private void UpdateAnimator()
+    {
+        if (animator == null) return;
+
+        // Speed is just input magnitude (0 to 1)
+        float inputMagnitude = new Vector2(inputX, inputZ).magnitude;
+        currentSpeed = Mathf.Lerp(currentSpeed, inputMagnitude, 10f * Time.deltaTime);
+
+        animator.SetFloat(SpeedHash, currentSpeed);
+        animator.SetBool(IsRunningHash, isRunning && currentSpeed > 0.1f);
+    }
+
+    void OnDrawGizmosSelected()
+    {
+        Gizmos.color = Color.yellow;
+        Gizmos.DrawWireSphere(transform.position, groundCheckDistance);
+    }
+}
