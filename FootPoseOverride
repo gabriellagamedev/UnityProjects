@@ -1,0 +1,158 @@
+using UnityEngine;
+
+public class FootPoseOverride : MonoBehaviour
+{
+    [Header("Right Foot")]
+    public Vector3 rFootPosition;
+    public Vector3 rFootRotation;
+    public Vector3 rMetatarsalsPosition;
+    public Vector3 rMetatarsalsRotation;
+    public Vector3 rToePosition;
+    public Vector3 rToeRotation;
+
+    [Header("Left Foot")]
+    public Vector3 lFootPosition;
+    public Vector3 lFootRotation;
+    public Vector3 lMetatarsalsPosition;
+    public Vector3 lMetatarsalsRotation;
+    public Vector3 lToePosition;
+    public Vector3 lToeRotation;
+
+    [Header("Options")]
+    public bool overridePosition = false;
+    public bool overrideRotation = true;
+    public float heightOffset = 0f;
+
+    // Bone references
+    private Transform rFoot, rMetatarsals, rToe;
+    private Transform lFoot, lMetatarsals, lToe;
+
+    void Start()
+    {
+        FindFootBones();
+    }
+
+    void FindFootBones()
+    {
+        Transform[] allTransforms = GetComponentsInChildren<Transform>();
+
+        foreach (Transform t in allTransforms)
+        {
+            switch (t.name)
+            {
+                case "rFoot":
+                    rFoot = t;
+                    break;
+                case "rMetatarsals":
+                    rMetatarsals = t;
+                    break;
+                case "rToe":
+                    rToe = t;
+                    break;
+                case "lFoot":
+                    lFoot = t;
+                    break;
+                case "lMetatarsals":
+                    lMetatarsals = t;
+                    break;
+                case "lToe":
+                    lToe = t;
+                    break;
+            }
+        }
+    }
+
+    void LateUpdate()
+    {
+        if (overridePosition)
+        {
+            Vector3 pos = transform.localPosition;
+            pos.y = heightOffset;
+            transform.localPosition = pos;
+        }
+
+        // Right foot
+        if (rFoot)
+        {
+            if (overridePosition) rFoot.localPosition = rFootPosition;
+            if (overrideRotation) rFoot.localRotation = Quaternion.Euler(rFootRotation);
+        }
+
+        if (rMetatarsals)
+        {
+            if (overridePosition) rMetatarsals.localPosition = rMetatarsalsPosition;
+            if (overrideRotation) rMetatarsals.localRotation = Quaternion.Euler(rMetatarsalsRotation);
+        }
+
+        if (rToe)
+        {
+            if (overridePosition) rToe.localPosition = rToePosition;
+            if (overrideRotation) rToe.localRotation = Quaternion.Euler(rToeRotation);
+        }
+
+        // Left foot
+        if (lFoot)
+        {
+            if (overridePosition) lFoot.localPosition = lFootPosition;
+            if (overrideRotation) lFoot.localRotation = Quaternion.Euler(lFootRotation);
+        }
+
+        if (lMetatarsals)
+        {
+            if (overridePosition) lMetatarsals.localPosition = lMetatarsalsPosition;
+            if (overrideRotation) lMetatarsals.localRotation = Quaternion.Euler(lMetatarsalsRotation);
+        }
+
+        if (lToe)
+        {
+            if (overridePosition) lToe.localPosition = lToePosition;
+            if (overrideRotation) lToe.localRotation = Quaternion.Euler(lToeRotation);
+        }
+    }
+
+    [ContextMenu("Capture Current Pose")]
+    void CaptureCurrentPose()
+    {
+        FindFootBones();
+
+        // Capture right foot
+        if (rFoot)
+        {
+            rFootPosition = rFoot.localPosition;
+            rFootRotation = rFoot.localRotation.eulerAngles;
+        }
+
+        if (rMetatarsals)
+        {
+            rMetatarsalsPosition = rMetatarsals.localPosition;
+            rMetatarsalsRotation = rMetatarsals.localRotation.eulerAngles;
+        }
+
+        if (rToe)
+        {
+            rToePosition = rToe.localPosition;
+            rToeRotation = rToe.localRotation.eulerAngles;
+        }
+
+        // Capture left foot
+        if (lFoot)
+        {
+            lFootPosition = lFoot.localPosition;
+            lFootRotation = lFoot.localRotation.eulerAngles;
+        }
+
+        if (lMetatarsals)
+        {
+            lMetatarsalsPosition = lMetatarsals.localPosition;
+            lMetatarsalsRotation = lMetatarsals.localRotation.eulerAngles;
+        }
+
+        if (lToe)
+        {
+            lToePosition = lToe.localPosition;
+            lToeRotation = lToe.localRotation.eulerAngles;
+        }
+
+        Debug.Log("Pose captured!");
+    }
+}
